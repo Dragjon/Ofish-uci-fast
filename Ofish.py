@@ -77,7 +77,7 @@ PST_KING = [
       -49,  -1, -27, -39, -46, -44, -33, -51,
       -14, -14, -22, -46, -44, -30, -15, -27,
       1,   7,  -8, -64, -43, -16,   9,   8,
-      -15,  36,  12, -54,   8, -28,  24,  14,
+      -15,  36,  12, -54,   -8, -28,  24,  14,
 ]
 
 PST_KING_ENDGAME = [
@@ -93,62 +93,69 @@ PST_KING_ENDGAME = [
 ]
 
 def evaluate_board(board):
-    score = 0
-
+    # Checkmate and draw conditions
     if board.is_checkmate():
         if board.turn == chess.WHITE:
-            return float('-inf')
+            return -10000
         else:
-            return float('inf')
-
-    if board.can_claim_draw() or board.is_stalemate() or board.is_insufficient_material():
+            return 10000
+    elif board.is_stalemate() or board.can_claim_draw() or board.is_insufficient_material():
         return 0
 
-    # Evaluate material
+    score = 0
+
     for square in chess.SQUARES:
         piece = board.piece_at(square)
-        if piece is not None:
-            # Adjust the sign for black pieces
-            sign = 1 if piece.color == chess.WHITE else -1
-
-            # Evaluate piece values
-            score += sign * (PIECE_VALUES[piece.piece_type] + get_pst_value(piece.piece_type, square, board))
-
-            # Bonus for open files for rooks and queens
-            if piece.piece_type in [chess.ROOK, chess.QUEEN]:
-                file_mask = chess.BB_FILES[chess.square_file(square)]
-                if not (file_mask & board.occupied_co[chess.WHITE] | board.occupied_co[chess.BLACK]):
-                    score += sign * 10  # You can adjust the bonus value
-
-    # Check bonus
-    if board.is_check():
-        if board.turn == chess.WHITE:
-           score -= 60  # You can adjust the bonus value
-        else:
-           score += 60
+        if piece is not None and piece.piece_type:
+            if piece.color == chess.WHITE:
+                score += PIECE_VALUES[piece.piece_type] + get_pst_value(piece.piece_type, square, board)
+            else:
+                score -= PIECE_VALUES[piece.piece_type] + get_pst_value(piece.piece_type, 63 - square, board)  # Mirrored for black
 
     return score
 
-
-
 def get_pst_value(piece_type, square, board):
-    if piece_type == chess.PAWN:
-        return PST_PAWN[square]
-    elif piece_type == chess.KNIGHT:
-        return PST_KNIGHT[square]
-    elif piece_type == chess.BISHOP:
-        return PST_BISHOP[square]
-    elif piece_type == chess.ROOK:
-        return PST_ROOK[square]
-    elif piece_type == chess.QUEEN:
-        return PST_QUEEN[square]
-    elif piece_type == chess.KING:
-        # Use endgame king PST if the game is in the endgame
-        if len(board.piece_map()) <= 10:
-            return PST_KING_ENDGAME[square]
-        else:
-            return PST_KING[square]
+
+    # Count the number of pieces on the board
+    piece_count = len(board.piece_map())
+
+    # Check if it's an endgame (less than 10 pieces on the board)
+    if piece_count <= 10:
+        king_pst = PST_KING_ENDGAME
+    else:
+       king_pst = PST_KING
+    
+    if board.turn == chess.WHITE:
+
+       if piece_type == chess.PAWN:
+            return PST_PAWN[square]
+       elif piece_type == chess.KNIGHT:
+           return PST_KNIGHT[square]
+       elif piece_type == chess.BISHOP:
+           return PST_BISHOP[square]
+       elif piece_type == chess.ROOK:
+           return PST_ROOK[square]
+       elif piece_type == chess.QUEEN:
+           return PST_QUEEN[square]
+       elif piece_type == chess.KING:
+           return king_pst[square]
+
+    else:
+
+       if piece_type == chess.PAWN:
+           return chess.square_mirror(PST_PAWN[square])
+       elif piece_type == chess.KNIGHT:
+           return chess.square_mirror(PST_KNIGHT[square])
+       elif piece_type == chess.BISHOP:
+           return chess.square_mirror(PST_BISHOP[square])
+       elif piece_type == chess.ROOK:
+           return chess.square_mirror(PST_ROOK[square])
+       elif piece_type == chess.QUEEN:
+           return chess.square_mirror(PST_QUEEN[square])
+       elif piece_type == chess.KING:
+           return chess.square_mirror(king_pst[square])
     return 0
+
 
 
 def quiescence_search(board, alpha, beta, color, depth):
@@ -179,61 +186,48 @@ def quiescence_search(board, alpha, beta, color, depth):
 
 def negamax(board, depth, alpha, beta, color):
     if depth == 0 or board.is_game_over():
-        if board.is_capture(board.peek()):
-            # Introduce quiescence search for captures with limited depth
-            return quiescence_search(board, alpha, beta, color, 2)
-        else:
-            return color * evaluate_board(board)
+
+       # Check if the move stack is not empty before calling peek
+       if board.move_stack:
+           # Introduce quiescence search for captures with limited depth
+           if board.is_capture(board.peek()):
+               return quiescence_search(board, alpha, beta, color, 2), None
+
+           else:
+              return color * evaluate_board(board), None           
 
     max_score = float('-inf')
-    for move in board.legal_moves:
-        board.push(move)
-        score = -negamax(board, depth - 1, -beta, -alpha, -color)
-        board.pop()
-
-        max_score = max(max_score, score)
-        alpha = max(alpha, score)
-        if alpha >= beta:
-            break
-
-    return max_score
-
-
-
-def get_best_move(board, depth):
-    for move in board.legal_moves:
-        board.push(move)
-
-        # Check if the move results in a checkmate
-        if board.is_checkmate():
-            board.pop()
-            return move
-
-        board.pop()
-
-    # If no immediate checkmate, use the original minimax logic
     best_move = None
-    max_score = float('-inf')
-    alpha = float('-inf')
-    beta = float('inf')
-
-    if board.turn == chess.WHITE:
-      color = 1
-    else:
-      color = -1
 
     for move in board.legal_moves:
         board.push(move)
-        score = -negamax(board, depth - 1, -beta, -alpha, -color)
+        score, _ = negamax(board, depth - 1, -beta, -alpha, -color)
         board.pop()
+
+        score = -score  # Fix: Negate the score here
 
         if score > max_score:
             max_score = score
             best_move = move
 
         alpha = max(alpha, score)
+        if alpha >= beta:
+            break
+
+    return max_score, best_move
+
+
+def get_best_move(board, depth):
+    if board.turn == chess.WHITE:
+        color = 1
+    else:
+        color = -1
+
+    max_score, best_move = negamax(board, depth, float('-inf'), float('inf'), color)
 
     return best_move
+
+
 
 def calculateMaxTime(board, remaining_time):
     if board.fullmove_number < 15:
