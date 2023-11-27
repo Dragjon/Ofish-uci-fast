@@ -7,7 +7,7 @@ options = {
 }
 
 executables = [
-    Executable("ofish.py"),
+    Executable("ofishv1e.py"),
 ]
 
 setup(
