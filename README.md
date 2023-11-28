@@ -5,10 +5,9 @@
 Play against Ofish at <a href="https://lichess.org/@/ofish">lichess.org</a>!
 # Current features
 - Negamax search with alphabeta pruning
-- Limited quiescience search extension to a depth of 2 ply
-- Basic evaluation
-- Piece square tables
+- Basic evaluation (piece values for middlegame and endgame)
+- Piece square tables (borrowed from PeSTO's evaluation function for middlegame and endgame)
 - Iterative deepening
+- Quiscence search limited to depth 2, because it is too slow even at depth 3.. Blame python!
 - Simple time management mechanism
 - Communicates in UCI
-- Flags on time when it is going to get checkmated (Its a feature! That's what you say when there is a bug somewhere in your code and you have no idea what to do...)
